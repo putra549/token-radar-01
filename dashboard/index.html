@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Launch Radar — pre-token protocols ranked by implied value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="brand">
+    <span class="brand-ring" aria-hidden="true"></span>
+    <div>
+      <h1>Token Launch Radar</h1>
+      <p class="tagline">Protocols that record no token yet, ranked by what a token would be worth if the market priced them like their tokened peers.</p>
+    </div>
+  </div>
+  <dl class="stats" id="stats" aria-label="Board summary"></dl>
+</header>
+<main>
+  <section class="controls" aria-label="Board controls">
+    <label class="ctl grow">
+      <span>Search</span>
+      <input id="q" type="search" placeholder="Name, slug or category" autocomplete="off">
+    </label>
+    <label class="ctl">
+      <span>Category</span>
+      <select id="category"></select>
+    </label>
+    <label class="ctl check">
+      <input id="watchlist-only" type="checkbox">
+      <span>Watchlist only <i class="wl-key" aria-hidden="true"></i></span>
+    </label>
+    <p class="count" id="count" role="status"></p>
+  </section>
+  <div class="table-wrap">
+    <table id="board">
+      <thead>
+        <tr>
+          <th data-sort="rank" class="num">Rank</th>
+          <th data-sort="name">Protocol</th>
+          <th data-sort="category">Category</th>
+          <th data-sort="chains" class="num">Chains</th>
+          <th data-sort="tvl" class="num">TVL</th>
+          <th data-sort="change" class="num">7d change</th>
+          <th data-sort="implied" class="num">Implied value</th>
+          <th data-sort="readiness" class="num">Readiness</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <footer class="model-note">
+    <h2>How the radar prices a launch</h2>
+    <p>Implied value = TVL &times; category multiple &times; momentum &times; maturity &times; breadth. The multiple is the
+    median market-cap-to-TVL ratio of the protocols in the same category whose tokens already trade, computed from this
+    snapshot (a thin category borrows its category group's median, then the global median). Momentum bends the price for
+    the week's TVL change, maturity adds a small capped premium for each year a protocol has run with no token, and
+    breadth adds a mild term for multi-chain reach. Tokened protocols are never ranked here: the board separates them
+    out and uses them only as the pricing peers.</p>
+    <p class="honest">An implied value is this entry's own estimate from DefiLlama figures in the sealed snapshot. It is
+    not a prediction that a token will launch, or when, or what it would trade at. A protocol shown as recording no token
+    may still have one its record does not carry.</p>
+  </footer>
+</main>
+<div class="scrim" id="scrim" hidden></div>
+<aside class="detail" id="detail" hidden aria-label="Protocol detail"></aside>
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
