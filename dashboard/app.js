@@ -17,8 +17,12 @@
     watchlist: params.get('watchlist') === '1',
     sort: 'rank',
     dir: 1,
-    selected: null
+    selected: null,
+    compare: []
   };
+  (params.get('compare') || '').split(',').forEach(function (slug) {
+    if (slug && rows.some(function (r) { return r.slug === slug; }) && state.compare.length < 3) state.compare.push(slug);
+  });
 
   function el(id) { return document.getElementById(id); }
   function make(tag, cls, text) {
@@ -61,6 +65,17 @@
     d.appendChild(make('dd', null, pair[1]));
     stats.appendChild(d);
   });
+
+  // ---- model validation line ----------------------------------------------
+  var v = DATA.validation;
+  if (v) {
+    var names = { median: 'the category median multiple', fitted: 'the fitted log-log curve', blend: 'the blend of median and fitted curve' };
+    el('validation').textContent =
+      'Held-out validation on this snapshot: ' + v.peers + ' tokened peers split ' + v.train + ' train / ' + v.test +
+      ' held out (by protocol-id hash). Mean absolute log10 error — median multiple ' + v.median_male.toFixed(3) +
+      ', fitted curve ' + v.fitted_male.toFixed(3) + ', blend ' + v.blend_male.toFixed(3) + '. The board is priced by ' +
+      names[v.adopted] + ', the held-out winner; each protocol\u2019s detail view shows both anchors.';
+  }
 
   // ---- controls -----------------------------------------------------------
   var qInput = el('q');
@@ -110,6 +125,7 @@
   heads.forEach(function (th) {
     th.addEventListener('click', function () {
       var key = th.getAttribute('data-sort');
+      if (!key) return;
       if (state.sort === key) {
         state.dir = -state.dir;
       } else {
@@ -179,7 +195,13 @@
       wrap.appendChild(bar);
       wrap.appendChild(make('span', null, String(r.readiness)));
       ready.appendChild(wrap);
-      [rank, name, cat, chains, tvl, chg, implied, ready].forEach(function (td) { tr.appendChild(td); });
+      var cmp = make('td', 'cmp');
+      var vs = make('button', 'vsbtn' + (state.compare.indexOf(r.slug) !== -1 ? ' on' : ''), state.compare.indexOf(r.slug) !== -1 ? 'Added' : 'vs');
+      vs.type = 'button';
+      vs.title = 'Add to the side-by-side comparison (up to 3)';
+      vs.addEventListener('click', function (ev) { ev.stopPropagation(); toggleCompare(r.slug); });
+      cmp.appendChild(vs);
+      [rank, name, cat, chains, tvl, chg, implied, ready, cmp].forEach(function (td) { tr.appendChild(td); });
       tr.addEventListener('click', function () { openDetail(r.slug); });
       tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') openDetail(r.slug); });
       frag.appendChild(tr);
@@ -247,6 +269,17 @@
     detail.appendChild(compRow('Momentum', r.momentum, (r.momentum - 0.85) / 0.4));
     detail.appendChild(compRow('Maturity', r.maturity, (r.maturity - 1) / 0.3));
     detail.appendChild(compRow('Breadth', r.breadth, (r.breadth - 1) / 0.1));
+    detail.appendChild(make('h3', null, 'The two peer anchors'));
+    var anchors = make('dl', 'kv');
+    anchors.appendChild(kv('Median multiple', r.median_multiple.toFixed(3) + ' → base ' + fmtUsd(r.tvl_usd * r.median_multiple)));
+    anchors.appendChild(kv('Fitted curve', r.fit_multiple.toFixed(3) + ' → base ' + fmtUsd(r.tvl_usd * r.fit_multiple)));
+    anchors.appendChild(kv('Priced by', DATA.validation ? DATA.validation.adopted + ' (held-out winner)' : 'n/a'));
+    anchors.appendChild(kv('Base used', fmtUsd(r.tvl_usd * r.multiple) + ' before adjustments'));
+    detail.appendChild(anchors);
+    detail.appendChild(make('p', 'anchor-note',
+      'The median anchor prices TVL at the category\u2019s own median token price; the fitted anchor reads the ' +
+      'category group\u2019s log-log curve of market cap on TVL, so it bends down as TVL grows. Where they disagree, ' +
+      'the disagreement itself is the uncertainty the validation measured.'));
     detail.appendChild(make('h3', null, 'Farm plan'));
     var ol = make('ol', 'steps');
     r.farm_steps.forEach(function (s) { ol.appendChild(make('li', null, s)); });
@@ -260,9 +293,84 @@
     scrim.hidden = true;
   }
   scrim.addEventListener('click', closeDetail);
-  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeDetail(); });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { closeDetail(); closeCompare(); } });
+
+  // ---- side-by-side comparison ---------------------------------------------
+  var tray = el('compare-tray');
+  var trayList = el('compare-list');
+  var panel = el('compare');
+  function toggleCompare(slug) {
+    var at = state.compare.indexOf(slug);
+    if (at !== -1) state.compare.splice(at, 1);
+    else {
+      if (state.compare.length >= 3) state.compare.shift();
+      state.compare.push(slug);
+    }
+    render();
+    renderTray();
+  }
+  function renderTray() {
+    tray.hidden = state.compare.length === 0;
+    trayList.replaceChildren();
+    state.compare.forEach(function (slug, i) {
+      var r = bySlug[slug];
+      if (!r) return;
+      var chip = make('span', 'chip', r.name);
+      chip.title = 'Rank #' + r.rank + ' — click to remove';
+      chip.addEventListener('click', function () { toggleCompare(slug); });
+      trayList.appendChild(chip);
+      if (i < state.compare.length - 1) trayList.appendChild(document.createTextNode(' '));
+    });
+    el('compare-open').disabled = state.compare.length < 2;
+  }
+  function cmpRow(label, values) {
+    var tr = document.createElement('tr');
+    tr.appendChild(make('th', 'cmp-lbl', label));
+    values.forEach(function (val) { tr.appendChild(make('td', null, val)); });
+    return tr;
+  }
+  function openCompare() {
+    var chosen = state.compare.map(function (s) { return bySlug[s]; }).filter(Boolean);
+    if (chosen.length < 2) return;
+    var table = el('compare-table');
+    table.replaceChildren();
+    var head = document.createElement('tr');
+    head.appendChild(make('th', 'cmp-lbl', ''));
+    chosen.forEach(function (r) {
+      var th = make('th', null, r.name);
+      th.appendChild(make('span', 'slug', '#' + r.rank + ' · ' + (r.category || 'Uncategorised')));
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    function pct(r) { var p = fmtPct(r.change_7d); return p === null ? 'n/a' : p; }
+    table.appendChild(cmpRow('Implied value', chosen.map(function (r) { return fmtUsd(r.implied_value_usd); })));
+    table.appendChild(cmpRow('TVL', chosen.map(function (r) { return fmtUsd(r.tvl_usd); })));
+    table.appendChild(cmpRow('7d TVL change', chosen.map(pct)));
+    table.appendChild(cmpRow('Base multiple (priced)', chosen.map(function (r) { return r.multiple.toFixed(3); })));
+    table.appendChild(cmpRow('Median anchor', chosen.map(function (r) { return r.median_multiple.toFixed(3) + ' → ' + fmtUsd(r.tvl_usd * r.median_multiple); })));
+    table.appendChild(cmpRow('Fitted anchor', chosen.map(function (r) { return r.fit_multiple.toFixed(3) + ' → ' + fmtUsd(r.tvl_usd * r.fit_multiple); })));
+    table.appendChild(cmpRow('Momentum', chosen.map(function (r) { return fmtMult(r.momentum); })));
+    table.appendChild(cmpRow('Maturity', chosen.map(function (r) { return fmtMult(r.maturity); })));
+    table.appendChild(cmpRow('Breadth', chosen.map(function (r) { return fmtMult(r.breadth); })));
+    table.appendChild(cmpRow('Readiness', chosen.map(function (r) { return r.readiness + ' / 100'; })));
+    table.appendChild(cmpRow('Running for', chosen.map(function (r) { return ageText(r.listed_at); })));
+    table.appendChild(cmpRow('Chains', chosen.map(function (r) { return r.chains.length ? r.chains.join(', ') : 'none recorded'; })));
+    table.appendChild(cmpRow('Watchlist', chosen.map(function (r) { return r.watchlist ? 'yes' : 'no — early row'; })));
+    table.appendChild(cmpRow('Farm plan', chosen.map(function (r) { return r.farm_steps.length + ' steps, generated from its own record'; })));
+    panel.hidden = false;
+    scrim.hidden = false;
+  }
+  function closeCompare() {
+    panel.hidden = true;
+    if (detail.hidden) scrim.hidden = true;
+  }
+  el('compare-open').addEventListener('click', openCompare);
+  el('compare-clear').addEventListener('click', function () { state.compare = []; render(); renderTray(); closeCompare(); });
+  el('compare-close').addEventListener('click', closeCompare);
 
   render();
+  renderTray();
   var startDetail = params.get('detail');
   if (startDetail && bySlug[startDetail]) openDetail(startDetail);
+  if (params.get('compare') && state.compare.length >= 2) openCompare();
 })();

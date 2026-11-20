@@ -45,6 +45,7 @@
           <th data-sort="change" class="num">7d change</th>
           <th data-sort="implied" class="num">Implied value</th>
           <th data-sort="readiness" class="num">Readiness</th>
+          <th class="cmp-head">Compare</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -52,17 +53,31 @@
   </div>
   <footer class="model-note">
     <h2>How the radar prices a launch</h2>
-    <p>Implied value = TVL &times; category multiple &times; momentum &times; maturity &times; breadth. The multiple is the
-    median market-cap-to-TVL ratio of the protocols in the same category whose tokens already trade, computed from this
-    snapshot (a thin category borrows its category group's median, then the global median). Momentum bends the price for
-    the week's TVL change, maturity adds a small capped premium for each year a protocol has run with no token, and
-    breadth adds a mild term for multi-chain reach. Tokened protocols are never ranked here: the board separates them
-    out and uses them only as the pricing peers.</p>
+    <p>Implied value = base value &times; momentum &times; maturity &times; breadth. The base value is chosen by
+    validation, not by assertion: three candidate pricings of a protocol's TVL — the category's median tokened
+    market-cap-to-TVL multiple, a log-log regression of market cap on TVL fitted per category group, and the geometric
+    blend of the two — are built on one half of the snapshot's tokened peers and scored on the held-out half, and the
+    winner prices the board. Momentum bends the price for the week's TVL change, maturity adds a small capped premium
+    for each year a protocol has run with no token, and breadth adds a mild term for multi-chain reach. Tokened
+    protocols are never ranked here: the board separates them out and uses them only as the pricing peers.</p>
+    <p id="validation" class="validation"></p>
     <p class="honest">An implied value is this entry's own estimate from DefiLlama figures in the sealed snapshot. It is
     not a prediction that a token will launch, or when, or what it would trade at. A protocol shown as recording no token
     may still have one its record does not carry.</p>
   </footer>
 </main>
+<div class="compare-tray" id="compare-tray" hidden>
+  <span class="tray-label">Compare:</span>
+  <span id="compare-list"></span>
+  <button id="compare-open" type="button">Side by side</button>
+  <button id="compare-clear" type="button">Clear</button>
+</div>
+<section class="compare" id="compare" hidden aria-label="Protocol comparison">
+  <button class="close" id="compare-close" aria-label="Close comparison">&times;</button>
+  <h2>Side by side</h2>
+  <p class="compare-sub">The model's own figures for each protocol, on the same rows, so the ranking can be audited.</p>
+  <div class="compare-scroll"><table id="compare-table"></table></div>
+</section>
 <div class="scrim" id="scrim" hidden></div>
 <aside class="detail" id="detail" hidden aria-label="Protocol detail"></aside>
 <script src="../data.js"></script>
